@@ -12,10 +12,28 @@ endif()
 project ("2048 v2.0")
 
 # Add source to this project's executable.
-add_executable (CMakeTarget "main.cpp")
+add_executable (2048-v2.0) # WIN32 for Release Build should be applied
+
+
+target_sources(2048-v2.0 PRIVATE
+	"src/main.cpp"
+)
+
+# Link SDL3
+find_package(SDL3)
+target_link_libraries(2048-v2.0 PRIVATE SDL3::SDL3)
+target_compile_definitions(2048-v2.0 PRIVATE SDL3_MAIN_HANDLED)
+target_link_options(2048-v2.0 PRIVATE -static)
+
+# Copy SDL3.dll to output directory after build
+add_custom_command(TARGET 2048-v2.0 POST_BUILD        # Adds a post-build event to MyTest
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different  # which executes "cmake - E copy_if_different..."
+        "${PROJECT_SOURCE_DIR}/SDL3/x86_64-w64-mingw32/bin/SDL3.dll"      # <--this is in-file
+        $<TARGET_FILE_DIR:2048-v2.0>)   
 
 if (CMAKE_VERSION VERSION_GREATER 3.12)
-  set_property(TARGET CMakeTarget PROPERTY CXX_STANDARD 20)
+  set_property(TARGET 2048-v2.0 PROPERTY CXX_STANDARD 20)
 endif()
+
 
 # TODO: Add tests and install targets if needed.
