@@ -26,9 +26,11 @@ target_compile_definitions(2048-v2.0 PRIVATE SDL3_MAIN_HANDLED)
 target_link_options(2048-v2.0 PRIVATE -static)
 
 # Copy SDL3.dll to output directory after build
-add_custom_command(TARGET 2048-v2.0 POST_BUILD        # Adds a post-build event to MyTest
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different  # which executes "cmake - E copy_if_different..."
-        "${PROJECT_SOURCE_DIR}/SDL3/x86_64-w64-mingw32/bin/SDL3.dll"      # <--this is in-file
+# for mingw32 compiler /SDL3/i686-w64-mingw32/bin/SDL3.dll
+# for msvc compiler /SDL3/x86_64-w64-mingw32/SDL3.dll
+add_custom_command(TARGET 2048-v2.0 POST_BUILD  
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different 
+        "${PROJECT_SOURCE_DIR}/SDL3/i686-w64-mingw32/bin/SDL3.dll"      
         $<TARGET_FILE_DIR:2048-v2.0>)   
 
 if (CMAKE_VERSION VERSION_GREATER 3.12)
