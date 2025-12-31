@@ -23,10 +23,9 @@ target_sources(2048-v2.0 PRIVATE
 
 # Link SDL3
 find_package(SDL3)
+find_package(SDL3/cmake/SDL3_image)
 target_link_libraries(2048-v2.0 PRIVATE SDL3::SDL3)
-target_link_libraries(2048-v2.0 PRIVATE 
-    mingw32 
-    ${CMAKE_SOURCE_DIR}/SDL3/i686-w64-mingw32/bin/SDL3_image.dll)
+target_link_libraries(2048-v2.0 PRIVATE SDL3_image::SDL3_image SDL3::SDL3)
 target_compile_definitions(2048-v2.0 PRIVATE SDL3_MAIN_HANDLED)
 target_link_options(2048-v2.0 PRIVATE -static)
 
