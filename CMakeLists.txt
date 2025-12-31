@@ -27,9 +27,6 @@ target_link_libraries(2048-v2.0 PRIVATE SDL3::SDL3)
 target_link_libraries(2048-v2.0 PRIVATE 
     mingw32 
     ${CMAKE_SOURCE_DIR}/SDL3/i686-w64-mingw32/bin/SDL3_image.dll)
-target_link_libraries(2048-v2.0 PRIVATE 
-    mingw32 
-    ${CMAKE_SOURCE_DIR}/SDL3/i686-w64-mingw32/bin/SDL2_mixer.dll)
 target_compile_definitions(2048-v2.0 PRIVATE SDL3_MAIN_HANDLED)
 target_link_options(2048-v2.0 PRIVATE -static)
 
@@ -48,10 +45,13 @@ add_custom_command(TARGET 2048-v2.0 POST_BUILD
         "${PROJECT_SOURCE_DIR}/SDL3/i686-w64-mingw32/bin/SDL3_image.dll"      
        $<TARGET_FILE_DIR:2048-v2.0>)
 
+
+#Copying assets folder to the main exe file
 add_custom_command(TARGET 2048-v2.0 POST_BUILD  
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different 
-        "${PROJECT_SOURCE_DIR}/SDL3/i686-w64-mingw32/bin/SDL2_mixer.dll"      
-       $<TARGET_FILE_DIR:2048-v2.0>) 
+    COMMAND ${CMAKE_COMMAND} -E copy_directory 
+        "${PROJECT_SOURCE_DIR}/assets"      
+       $<TARGET_FILE_DIR:2048-v2.0>/assets)
+
 
 if (CMAKE_VERSION VERSION_GREATER 3.12)
   set_property(TARGET 2048-v2.0 PROPERTY CXX_STANDARD 20)
