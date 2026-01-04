@@ -16,12 +16,21 @@ static HWND WindowHandle = FindWindowA(NULL, "2048 v2.0");
 #include <SDL3/SDL_messagebox.h>
 
 #include <SDL3_image/SDL_image.h>
+#include <SDL3_ttf/SDL_ttf.h>
 
 static SDL_Window* Window = NULL;
 static SDL_Renderer* Renderer = NULL;
 
+//UI
+#define FONT_SIZE 30
+TTF_Font* Font = NULL;
+SDL_Color Font_Color = { 0, 0, 0, 255 };
 
 static SDL_Texture* Background_Texture = NULL;
+static SDL_Texture* Tile_Background_Texture = NULL;
+
+//In Game Variables
+int Score = 0;
 
 /* This function runs once at startup. */
 SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
@@ -34,13 +43,27 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
         return SDL_APP_FAILURE;
     }
 
-    if (!SDL_CreateWindowAndRenderer("2048 v2.0", 576 * 0.7, 778 * 0.7, 0, &Window, &Renderer))
+    if (!SDL_CreateWindowAndRenderer("2048 v2.0", 576 * 0.8, 778 * 0.7, 0, &Window, &Renderer))
     {
         SDL_Log("Couldn't create window/renderer: %s", SDL_GetError());
         return SDL_APP_FAILURE;
     }
 
-    SDL_SetRenderLogicalPresentation(Renderer, 576 * 0.7, 778 * 0.7, SDL_LOGICAL_PRESENTATION_LETTERBOX);
+    if (!TTF_Init())
+    {
+        SDL_Log("Couldn't initialize TTF library: %s", SDL_GetError());
+        return SDL_APP_FAILURE;
+    }
+
+    //Loading Font
+    Font = TTF_OpenFont("assets/times.ttf", FONT_SIZE);
+    if (Font == NULL)
+    {
+        SDL_Log("Couldn't load the font: %s", SDL_GetError());
+        return SDL_APP_FAILURE;
+    }
+
+    SDL_SetRenderLogicalPresentation(Renderer, 576 * 0.8, 778 * 0.7, SDL_LOGICAL_PRESENTATION_LETTERBOX);
 
     //Background to white
     SDL_SetRenderDrawColor(Renderer, 255, 255, 255, 255);
@@ -52,6 +75,14 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
         SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "2048 v2.0", "Couldn't load texture\nExiting the game", Window);
         return SDL_APP_FAILURE;
     }
+
+    //
+    Tile_Background_Texture = IMG_LoadTexture(Renderer, "assets/Tile_Background.png");
+    if (!Tile_Background_Texture)
+    {
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "2048 v2.0", "Couldn't load texture\nExiting the game", Window);
+        return SDL_APP_FAILURE;
+	}
 
     //Setting the alpha value for the background texture to 0.8
     if (SDL_SetTextureAlphaModFloat(Background_Texture, 0.8) == false)
@@ -76,6 +107,8 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event)
         {
         case SDL_SCANCODE_UP:
             SDL_Log("Up Arrow Key Pressed");
+            /// JUST FOR TEST: (DELETE PLS)
+            Score++;
             break;
 		case SDL_SCANCODE_DOWN:
             SDL_Log("Down Arrow Key Pressed");
@@ -98,9 +131,43 @@ SDL_AppResult SDL_AppIterate(void* appstate)
 	SDL_RenderClear(Renderer);
 
     //Rendering stuff comes here
+    
+    //Rendering the Background
     SDL_RenderTexture(Renderer, Background_Texture, NULL, NULL);
 
+    //Rendering the Grid
+    for(int i = 0; i < 4; i++)
+    {
+        SDL_FRect destRect1 = { 30.0f, 70.0f + (i * 100.0f), 64.0f * 1.5f, 64.0f * 1.5f};
+        SDL_RenderTexture(Renderer, Tile_Background_Texture, NULL, &destRect1);
+
+        SDL_FRect destRect2 = { 130.0f, 70.0f + (i * 100.0f), 64.0f * 1.5f, 64.0f * 1.5f };
+        SDL_RenderTexture(Renderer, Tile_Background_Texture, NULL, &destRect2);
+
+        SDL_FRect destRect3 = { 230.0f, 70.0f + (i * 100.0f), 64.0f * 1.5f, 64.0f * 1.5f };
+        SDL_RenderTexture(Renderer, Tile_Background_Texture, NULL, &destRect3);
+
+        SDL_FRect destRect4 = { 330.0f, 70.0f + (i * 100.0f), 64.0f * 1.5f, 64.0f * 1.5f };
+        SDL_RenderTexture(Renderer, Tile_Background_Texture, NULL, &destRect4);
+	}
+
+
+    /// JUST FOR TEST: (DELETE PLS)
+    char scoreText[32];
+    SDL_snprintf(scoreText, sizeof(scoreText), "Score: %d", Score);
+    SDL_Surface* surface = TTF_RenderText_Blended(Font, scoreText, 0, Font_Color);
+    SDL_Texture* texture = SDL_CreateTextureFromSurface(Renderer, surface);
+    SDL_FRect destRect = { 20.0f, 20.0f, (float)surface->w, (float)surface->h };
+    SDL_RenderTexture(Renderer, texture, NULL, &destRect);
+
+
+
     SDL_RenderPresent(Renderer);
+
+
+    /// JUST FOR TEST: (DELETE PLS)
+    SDL_DestroySurface(surface);
+    SDL_DestroyTexture(texture);
 
     return SDL_APP_CONTINUE;
 }
@@ -108,5 +175,6 @@ SDL_AppResult SDL_AppIterate(void* appstate)
 /* Runs on shutdown */
 void SDL_AppQuit(void* appstate, SDL_AppResult result)
 {
-
+    TTF_CloseFont(Font);
+    TTF_Quit();
 }
