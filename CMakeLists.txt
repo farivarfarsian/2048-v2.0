@@ -9,7 +9,11 @@ if (POLICY CMP0141)
   set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "$<IF:$<AND:$<C_COMPILER_ID:MSVC>,$<CXX_COMPILER_ID:MSVC>>,$<$<CONFIG:Debug,RelWithDebInfo>:EditAndContinue>,$<$<CONFIG:Debug,RelWithDebInfo>:ProgramDatabase>>")
 endif()
 
-project ("2048 v2.0")
+project ("2048 v2.0" LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIGURATION>")
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIGURATION>")
@@ -19,6 +23,7 @@ add_executable (2048-v2.0) # WIN32 for Release Build should be applied
 
 target_sources(2048-v2.0 PRIVATE
 	"src/main.cpp"
+    "src/tinyxml2.cpp"
 )
 
 # Link SDL3
@@ -31,24 +36,27 @@ target_link_libraries(2048-v2.0 PRIVATE SDL3_ttf::SDL3_ttf SDL3::SDL3)
 target_compile_definitions(2048-v2.0 PRIVATE SDL3_MAIN_HANDLED)
 target_link_options(2048-v2.0 PRIVATE -static)
 
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+    target_compile_options(2048-v2.0 PRIVATE "-lstdc++fs")
+endif()
 
+# Include folder
+target_include_directories(2048-v2.0 PRIVATE "include")
 
 # Copy SDL3.dll to output directory after build
-# for mingw32 compiler /SDL3/i686-w64-mingw32/bin/SDL3.dll (Doesn't work with 64bit version I don't know WHY)
-# for msvc compiler /SDL3/x86_64-w64-mingw32/SDL3.dll
 add_custom_command(TARGET 2048-v2.0 POST_BUILD  
     COMMAND ${CMAKE_COMMAND} -E copy_if_different 
-        "${PROJECT_SOURCE_DIR}/SDL3/i686-w64-mingw32/bin/SDL3.dll"      
+        "${PROJECT_SOURCE_DIR}/SDL3/x86_64-w64-mingw32/bin/SDL3.dll"      
        $<TARGET_FILE_DIR:2048-v2.0>)
        
 add_custom_command(TARGET 2048-v2.0 POST_BUILD  
     COMMAND ${CMAKE_COMMAND} -E copy_if_different 
-        "${PROJECT_SOURCE_DIR}/SDL3/i686-w64-mingw32/bin/SDL3_image.dll"      
+        "${PROJECT_SOURCE_DIR}/SDL3/x86_64-w64-mingw32/bin/SDL3_image.dll"      
        $<TARGET_FILE_DIR:2048-v2.0>)
 
 add_custom_command(TARGET 2048-v2.0 POST_BUILD  
     COMMAND ${CMAKE_COMMAND} -E copy_if_different 
-        "${PROJECT_SOURCE_DIR}/SDL3/i686-w64-mingw32/bin/SDL3_ttf.dll"      
+        "${PROJECT_SOURCE_DIR}/SDL3/x86_64-w64-mingw32/bin/SDL3_ttf.dll"      
        $<TARGET_FILE_DIR:2048-v2.0>)
 
 #Copying assets folder to the main exe file
@@ -61,6 +69,3 @@ add_custom_command(TARGET 2048-v2.0 POST_BUILD
 if (CMAKE_VERSION VERSION_GREATER 3.12)
   set_property(TARGET 2048-v2.0 PROPERTY CXX_STANDARD 20)
 endif()
-
-
-# TODO: Add tests and install targets if needed.
