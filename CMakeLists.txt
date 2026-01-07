@@ -11,7 +11,8 @@ endif()
 
 project ("2048 v2.0" LANGUAGES CXX)
 
-set(CMAKE_CXX_STANDARD 20)
+#Setting C++23
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
@@ -36,8 +37,9 @@ target_link_libraries(2048-v2.0 PRIVATE SDL3_ttf::SDL3_ttf SDL3::SDL3)
 target_compile_definitions(2048-v2.0 PRIVATE SDL3_MAIN_HANDLED)
 target_link_options(2048-v2.0 PRIVATE -static)
 
+# Making sure GNU Compiler uses latest C++23 + Optimization Level 3 flag for the compiler
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
-    target_compile_options(2048-v2.0 PRIVATE "-lstdc++fs")
+    target_compile_options(2048-v2.0 PRIVATE "-std=gnu++23" "-O3")
 endif()
 
 # Include folder
