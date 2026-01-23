@@ -1,12 +1,7 @@
 ﻿//Based on https://play2048.co/
 
 //TODO:
-// // - Add Bomb and Jump features 
-// // - Add a Loading Screen
 // // - Add a Leaderboard
-// // - Added a GameOver screen
-
-
 
 //Exclusive for Windows
 #ifdef _WIN32
@@ -15,9 +10,17 @@
 static HWND WindowHandle = NULL;
 #endif
 
+//TinyXML Library
+#include <tinyxml2.h>
+using namespace tinyxml2;
+
 //STD Libraries
 #include <string>
 #include <random>
+#include <filesystem>
+
+// for running a pieace of code only once
+bool Flag = 0 , Flag1 = 0;
 
 //SDL
 #define SDL_MAIN_USE_CALLBACKS 1
@@ -35,14 +38,18 @@ static HWND WindowHandle = NULL;
 
 static SDL_Window* Window = NULL;
 static SDL_Renderer* Renderer = NULL;
+#define WINDOW_WIDTH (576 * 0.8)
+#define WINDOW_HEIGHT (778 * 0.7)
 
-//UI
+// HUD
 #define FONT_SIZE 30
 TTF_Font* Font = NULL;
 SDL_Color Font_Color = { 0, 0, 0, 255 };
 
-static SDL_Texture* Background_Texture = NULL;
-static SDL_Texture* Tile_Background_Texture = NULL;
+static SDL_Texture* Background_Texture = nullptr;
+static SDL_Texture* MainMenu_Texture = nullptr;
+static SDL_Texture* Tile_Background_Texture = nullptr;
+static SDL_Texture* BottomUI = nullptr;
 
 //In Game Variables
 enum TileKind
@@ -62,12 +69,48 @@ enum TileKind
 };
 
 int Grid[4][4] = { TILE_EMPTY };
+std::string InputUserText;
 int Score = 0;
+bool UserIsTyping = false;
+
+// Handeling in-game events (for a better and cleaner code building an event or layer system is recommended)
+bool IsScoreChanged = false;
+bool IsGameOver = false;
+bool IsMainMenuOn = true;
+bool IsLeaderboardOn = false;
 bool IsGridFull = false;
+
 SDL_FRect TilePosition = { 30.0f, 70.0f, 64.0f * 1.5f, 64.0f * 1.5f };
+// Buttons
+SDL_FRect Play_Button, Leaderboard_Button;
+
+// Wrapper Functions and Variables
+SDL_Texture* ScoreTextWrapper = nullptr;
+SDL_Texture* UserInputTextureWrapper = nullptr;
+SDL_Texture* GameOverTextureWrapper = nullptr;
+SDL_Texture* MainMenu_Play_TextureWrapper = nullptr;
+SDL_Texture* MainMenu_Leaderboard_TextureWrapper = nullptr;
+
+//Leaderboard
+XMLDocument Document;
+XMLElement* Leaderboard = nullptr;
+XMLElement* CurrentUser = nullptr;
 
 //Game features
 bool JumpAbility = false;
+bool AutoSave = true;
+void SaveTheGame()
+{
+    CurrentUser = Document.NewElement("User");
+    CurrentUser->SetAttribute(InputUserText.c_str(), 1);
+    Document.FirstChildElement()->InsertEndChild(CurrentUser);
+
+    XMLElement* ScoreElement = Document.NewElement("Score");
+    ScoreElement->SetText(Score);
+    CurrentUser->InsertEndChild(ScoreElement);
+
+    Document.SaveFile("Leaderboard.xml");
+}
 
 //Preloading the textures for the tiles
 static SDL_Texture* _2_Texture = NULL;
@@ -81,6 +124,247 @@ static SDL_Texture* _256_Texture = NULL;
 static SDL_Texture* _512_Texture = NULL;
 static SDL_Texture* _1024_Texture = NULL;
 static SDL_Texture* _2048_Texture = NULL;
+
+// Scenes
+// the better method to implement this would be with a class and ESC and using OOP after all, but for simplicity implementation is c like
+// 
+// 2048 Game
+void _2048GameScene()
+{
+    //Rendering the Grid
+    for (int i = 0; i < 4; i++)
+    {
+        SDL_FRect destRect1 = { 30.0f, 70.0f + (i * 100.0f), 64.0f * 1.5f, 64.0f * 1.5f };
+        SDL_RenderTexture(Renderer, Tile_Background_Texture, NULL, &destRect1);
+
+        SDL_FRect destRect2 = { 130.0f, 70.0f + (i * 100.0f), 64.0f * 1.5f, 64.0f * 1.5f };
+        SDL_RenderTexture(Renderer, Tile_Background_Texture, NULL, &destRect2);
+
+        SDL_FRect destRect3 = { 230.0f, 70.0f + (i * 100.0f), 64.0f * 1.5f, 64.0f * 1.5f };
+        SDL_RenderTexture(Renderer, Tile_Background_Texture, NULL, &destRect3);
+
+        SDL_FRect destRect4 = { 330.0f, 70.0f + (i * 100.0f), 64.0f * 1.5f, 64.0f * 1.5f };
+        SDL_RenderTexture(Renderer, Tile_Background_Texture, NULL, &destRect4);
+    }
+
+    //Rendering the Tiles
+    for (int i = 0; i < 4; i++)
+    {
+        for (int j = 0; j < 4; j++)
+        {
+            switch (Grid[i][j])
+            {
+            case TILE_2:
+                TilePosition.x = 30.0f + (j * 100.0f);
+                TilePosition.y = 70.0f + (i * 100.0f);
+                SDL_RenderTexture(Renderer, _2_Texture, NULL, &TilePosition);
+                break;
+            case TILE_4:
+                TilePosition.x = 30.0f + (j * 100.0f);
+                TilePosition.y = 70.0f + (i * 100.0f);
+                SDL_RenderTexture(Renderer, _4_Texture, NULL, &TilePosition);
+                break;
+            case TILE_8:
+                TilePosition.x = 30.0f + (j * 100.0f);
+                TilePosition.y = 70.0f + (i * 100.0f);
+                SDL_RenderTexture(Renderer, _8_Texture, NULL, &TilePosition);
+                break;
+            case TILE_16:
+                TilePosition.x = 30.0f + (j * 100.0f);
+                TilePosition.y = 70.0f + (i * 100.0f);
+                SDL_RenderTexture(Renderer, _16_Texture, NULL, &TilePosition);
+                break;
+            case TILE_32:
+                TilePosition.x = 30.0f + (j * 100.0f);
+                TilePosition.y = 70.0f + (i * 100.0f);
+                SDL_RenderTexture(Renderer, _32_Texture, NULL, &TilePosition);
+                break;
+            case TILE_64:
+                TilePosition.x = 30.0f + (j * 100.0f);
+                TilePosition.y = 70.0f + (i * 100.0f);
+                SDL_RenderTexture(Renderer, _64_Texture, NULL, &TilePosition);
+                break;
+            case TILE_128:
+                TilePosition.x = 30.0f + (j * 100.0f);
+                TilePosition.y = 70.0f + (i * 100.0f);
+                SDL_RenderTexture(Renderer, _128_Texture, NULL, &TilePosition);
+                break;
+            case TILE_256:
+                TilePosition.x = 30.0f + (j * 100.0f);
+                TilePosition.y = 70.0f + (i * 100.0f);
+                SDL_RenderTexture(Renderer, _256_Texture, NULL, &TilePosition);
+                break;
+            case TILE_512:
+                TilePosition.x = 30.0f + (j * 100.0f);
+                TilePosition.y = 70.0f + (i * 100.0f);
+                SDL_RenderTexture(Renderer, _512_Texture, NULL, &TilePosition);
+                break;
+            case TILE_1024:
+                TilePosition.x = 30.0f + (j * 100.0f);
+                TilePosition.y = 70.0f + (i * 100.0f);
+                SDL_RenderTexture(Renderer, _1024_Texture, NULL, &TilePosition);
+                break;
+            case TILE_2048:
+                TilePosition.x = 30.0f + (j * 100.0f);
+                TilePosition.y = 70.0f + (i * 100.0f);
+                SDL_RenderTexture(Renderer, _2048_Texture, NULL, &TilePosition);
+                break;
+            }
+        }
+    }
+
+    //Getting the Username from input
+    //std::call_once(flag, UserIsTypingWrapperTrue);
+    if (Flag == 0)
+    {
+        UserIsTyping = true;
+        Flag = 1;
+    }
+
+    if (UserIsTyping == true)
+    {
+        SDL_SetRenderDrawBlendMode(Renderer, SDL_BLENDMODE_BLEND);
+        SDL_SetRenderDrawColor(Renderer, 0, 0, 0, 180);
+        SDL_RenderFillRect(Renderer, NULL);
+
+        SDL_StartTextInput(Window);
+
+        SDL_FRect DestRect;
+        SDL_Surface* Surface = nullptr;
+        Surface = TTF_RenderText_Blended(Font, "Enter your Username: ", 0, Font_Color);
+        UserInputTextureWrapper = SDL_CreateTextureFromSurface(Renderer, Surface);
+        DestRect = { (WINDOW_WIDTH / 2) - 150, (WINDOW_HEIGHT / 2) - 60, (float)Surface->w, (float)Surface->h };
+
+        SDL_RenderTexture(Renderer, UserInputTextureWrapper, NULL, &DestRect);
+
+        //Cleaning Up for UserInput Stuff
+        SDL_DestroySurface(Surface);
+        SDL_DestroyTexture(UserInputTextureWrapper);
+
+        if (InputUserText.empty() == false)
+        {
+            SDL_Surface* Surface = TTF_RenderText_Blended(Font, InputUserText.c_str(), 0, Font_Color);
+            UserInputTextureWrapper = SDL_CreateTextureFromSurface(Renderer, Surface);
+            if (InputUserText.length() > 12)
+            {
+                DestRect = { (WINDOW_WIDTH / 2) - 150, (WINDOW_HEIGHT / 2) - 30, (float)Surface->w, (float)Surface->h };
+            }
+            else
+            {
+                DestRect = { (WINDOW_WIDTH / 2) - 50, (WINDOW_HEIGHT / 2) - 30, (float)Surface->w, (float)Surface->h };
+            }
+            SDL_DestroySurface(Surface);
+            SDL_RenderTexture(Renderer, UserInputTextureWrapper, NULL, &DestRect);
+        }
+    }
+}
+void _2048GameUIScene()
+{
+    //Rendering the Background
+    SDL_RenderTexture(Renderer, Background_Texture, NULL, NULL);
+
+    SDL_FRect DestRect = { 30.0f, 471.0f, 576 * 0.7, 128 * 0.6 };
+    SDL_RenderTexture(Renderer, BottomUI, NULL, &DestRect);
+
+    if (IsScoreChanged == true)
+    {
+        SDL_Surface* Surface = TTF_RenderText_Blended(Font, ("Score: " + std::to_string(Score)).c_str(), 0, Font_Color);
+        ScoreTextWrapper = SDL_CreateTextureFromSurface(Renderer, Surface);
+        DestRect = { 20.0f, 20.0f, (float)Surface->w, (float)Surface->h };
+        SDL_DestroySurface(Surface);
+        SDL_RenderTexture(Renderer, ScoreTextWrapper, NULL, &DestRect);
+    }
+}
+// Main Menu
+void MainMenuScene()
+{
+    SDL_FRect DestRect;
+    DestRect = { 0.0f, 0.0f, 576, 900 };
+
+    SDL_RenderTexture(Renderer, MainMenu_Texture, NULL, &DestRect);
+
+    SDL_Surface* Surface = nullptr;
+    Surface = TTF_RenderText_Blended(Font, "Play", 0, { 255, 255, 0, 255 });
+    MainMenu_Play_TextureWrapper = SDL_CreateTextureFromSurface(Renderer, Surface);
+    Play_Button = { (WINDOW_WIDTH / 2) - 30, (WINDOW_HEIGHT / 2) - 75, (float)Surface->w, (float)Surface->h };
+    SDL_DestroySurface(Surface);
+    SDL_RenderTexture(Renderer, MainMenu_Play_TextureWrapper, NULL, &Play_Button);
+
+    Surface = TTF_RenderText_Blended(Font, "Leaderboard", 0, { 0, 0, 255, 255 });
+    MainMenu_Leaderboard_TextureWrapper = SDL_CreateTextureFromSurface(Renderer, Surface);
+    Leaderboard_Button = { (WINDOW_WIDTH / 2) - 90, (WINDOW_HEIGHT / 2) + 15, (float)Surface->w, (float)Surface->h };
+    SDL_DestroySurface(Surface);
+
+    SDL_RenderTexture(Renderer, MainMenu_Leaderboard_TextureWrapper, NULL, &Leaderboard_Button);
+}
+// Game Over
+void GameOverScene()
+{
+    SDL_SetRenderDrawBlendMode(Renderer, SDL_BLENDMODE_BLEND);
+    SDL_SetRenderDrawColor(Renderer, 0, 0, 0, 180);
+    SDL_RenderFillRect(Renderer, NULL);
+
+    SDL_FRect DestRect;
+    SDL_Surface* Surface = nullptr;
+    Surface = TTF_RenderText_Blended(Font, "GAME OVER !", 0, { 255, 0, 0, 255 });
+    GameOverTextureWrapper = SDL_CreateTextureFromSurface(Renderer, Surface);
+    DestRect = { (WINDOW_WIDTH / 2) - 120, (WINDOW_HEIGHT / 2) - 60, (float)Surface->w, (float)Surface->h };
+
+    SDL_RenderTexture(Renderer, GameOverTextureWrapper, NULL, &DestRect);
+
+    Surface = TTF_RenderText_Blended(Font, "Press any key to continue", 0, { 0, 255, 0, 255 });
+    GameOverTextureWrapper = SDL_CreateTextureFromSurface(Renderer, Surface);
+    DestRect = { (WINDOW_WIDTH / 2) - 200, (WINDOW_HEIGHT / 2) - 20, (float)Surface->w, (float)Surface->h };
+
+
+    SDL_RenderTexture(Renderer, GameOverTextureWrapper, NULL, &DestRect);
+
+    SDL_DestroySurface(Surface);
+
+    // Clearing old data
+    for (int i = 0; i < 4; i++)
+    {
+        for (int j = 0; j < 4; j++)
+        {
+            Grid[i][j] = TILE_EMPTY;
+        }
+    }
+    Score = 0;
+    InputUserText.clear();
+    Flag = 0, Flag1 = 0;
+
+    Grid[0][0] = TILE_2;
+    Grid[3][3] = TILE_2;
+
+    // Going Back to Main Menu ... 
+}
+
+// Scene Killers
+// 
+// 2048 Game
+void _2048KillGameScene()
+{
+    SDL_DestroyTexture(Tile_Background_Texture);
+
+    SDL_DestroyTexture(_2_Texture);
+    SDL_DestroyTexture(_4_Texture);
+    SDL_DestroyTexture(_8_Texture);
+    SDL_DestroyTexture(_16_Texture);
+    SDL_DestroyTexture(_32_Texture);
+    SDL_DestroyTexture(_64_Texture);
+    SDL_DestroyTexture(_128_Texture);
+    SDL_DestroyTexture(_256_Texture);
+    SDL_DestroyTexture(_512_Texture);
+    SDL_DestroyTexture(_1024_Texture);
+    SDL_DestroyTexture(_2048_Texture);
+
+    SDL_DestroyTexture(BottomUI);
+}
+void _2048KillGameUIScene()
+{
+    SDL_DestroyTexture(Background_Texture);
+    SDL_DestroyTexture(MainMenu_Texture);
+}
 
 // Functions for Handeling Moves
 void GoUp()
@@ -111,6 +395,7 @@ void GoUp()
                             {
                                 Grid[k][j] *= 2;
                                 Score += Grid[k][j];
+                                IsScoreChanged = true;
                                 Grid[i][j] = TILE_EMPTY;
                             }
                         }
@@ -149,6 +434,7 @@ void GoDown()
                             {
                                 Grid[k][j] *= 2;
                                 Score += Grid[k][j];
+                                IsScoreChanged = true;
                                 Grid[i][j] = TILE_EMPTY;
                             }
                         }
@@ -186,6 +472,7 @@ void GoLeft()
                             {
                                 Grid[i][k] *= 2;
                                 Score += Grid[i][k];
+                                IsScoreChanged = true;
                                 Grid[i][j] = TILE_EMPTY;
                             }
                         }
@@ -223,6 +510,7 @@ void GoRight()
                             {
                                 Grid[i][k] *= 2;
                                 Score += Grid[i][k];
+                                IsScoreChanged = true;
                                 Grid[i][j] = TILE_EMPTY;
                             }
                         }
@@ -281,8 +569,20 @@ void RespawnTile()
             }
         }
 
-		//No More Moves Available - Game Over
-        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_INFORMATION, "2048 v2.0", "Game Over! No More Moves Available!", Window);
+        // Insert Username + Score to XML
+        // 
+        // 
+        //
+        //std::call_once(flag1, SaveTheGame); 
+        if (Flag1 == 0)
+        {
+            SaveTheGame();
+            Flag1 = 1;
+        }
+
+        
+        //No More Moves Available - Game Over
+        IsGameOver = true;
 
         return;
     }
@@ -346,6 +646,20 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
         return SDL_APP_FAILURE;
     }
 
+    MainMenu_Texture = IMG_LoadTexture(Renderer, "assets/Background2.png");
+    if (!MainMenu_Texture)
+    {
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "2048 v2.0", "Couldn't load texture\nExiting the game", Window);
+        return SDL_APP_FAILURE;
+    }
+
+    BottomUI = IMG_LoadTexture(Renderer, "assets/BottomUI.png");
+    if (!BottomUI)
+    {
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "2048 v2.0", "Couldn't load texture\nExiting the game", Window);
+        return SDL_APP_FAILURE;
+    }
+
     //Setting the alpha value for the background texture to 0.8
     if (SDL_SetTextureAlphaModFloat(Background_Texture, 0.8) == false)
     {
@@ -361,8 +675,29 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
         return SDL_APP_FAILURE;
 	}
 
+    // Leaderboard file
+    if (std::filesystem::exists("Leaderboard.xml") == true)
+    {
+        if (Document.LoadFile("Leaderboard.xml") != tinyxml2::XML_SUCCESS)
+        {
+            SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "2048 v2.0", "Couldn't load the ""Leaderboard.xml"" file\nExiting the game", Window);
+            return SDL_APP_FAILURE;
+        }
+    }
+    else
+    {
+        //Creating the file
+        Leaderboard = Document.NewElement("Leaderboard");
+        Document.InsertFirstChild(Leaderboard);
+        if (Document.SaveFile("Leaderboard.xml") != 0)
+        {
+            SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "2048 v2.0", "Couldn't write to ""Leaderboard.xml"" file\nExiting the game", Window);
+            return SDL_APP_FAILURE;
+        }
+    }
 
-	// JUST FOR TEST: (DELETE PLS) TODO: Loading Screen
+
+	// TODO: Loading Screen
 	_2_Texture = IMG_LoadTexture(Renderer, "assets/2.png");
     if(!_2_Texture)
     {
@@ -431,6 +766,7 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
     }
 
     //Create entities
+    //Could Implent it to be random but what's the point ?!
     Grid[0][0] = TILE_2;
     Grid[3][3] = TILE_2;
 
@@ -443,60 +779,136 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event)
     switch (event->type)
     {
     case SDL_EVENT_QUIT:
+        if (AutoSave == true)
+        {
+            if (InputUserText.empty() == true)
+            {
+                InputUserText = "default";
+            }
+            SaveTheGame();
+        }
         return SDL_APP_SUCCESS; // End of the program
         break;
-    case SDL_EVENT_MOUSE_BUTTON_DOWN:
+    case SDL_EVENT_TEXT_INPUT:
+        InputUserText += event->text.text;
+        break;
+    case SDL_EVENT_MOUSE_MOTION:
+        break;
+    case SDL_EVENT_MOUSE_BUTTON_DOWN: 
         float x, y;
         SDL_GetMouseState(&x, &y);
         SDL_FPoint MousePoint;
-		MousePoint.x = x;
-		MousePoint.y = y;
-        if (SDL_PointInRectFloat(&MousePoint, &TilePosition))
+        MousePoint.x = x;
+        MousePoint.y = y;
+        if (IsMainMenuOn == true)
         {
-            SDL_Log("Mouse Button Pressed inside the Tile at (%.2f, %.2f)", event->button.x, event->button.y);
-        }
-        else
-        {
-            SDL_Log("Mouse Button Pressed outside the Tile at (%.2f, %.2f)", event->button.x, event->button.y);
-        }
-		break;
-    case SDL_EVENT_KEY_DOWN: //Inputs of the Game
-        switch (event->key.scancode)
-        {
-        case SDL_SCANCODE_UP:          
-            GoUp();
-            RespawnTile();
-            SDL_Log("Up Arrow Key Pressed");
-            break;
-		case SDL_SCANCODE_DOWN:
-            GoDown();
-            RespawnTile();
-            SDL_Log("Down Arrow Key Pressed");
-            break;
-        case SDL_SCANCODE_LEFT:
-			GoLeft();
-            RespawnTile();
-            SDL_Log("Left Arrow Key Pressed");
-			break;
-        case SDL_SCANCODE_RIGHT:
-			GoRight();
-            RespawnTile();
-            SDL_Log("Right Arrow Key Pressed");
-            break;
-        case SDL_SCANCODE_J:
-            JumpAbility = !JumpAbility;
-            if (JumpAbility)
+            if (SDL_PointInRectFloat(&MousePoint, &Play_Button))
             {
-                SDL_Log("Jump Ability Enabled");
+                IsMainMenuOn = false;
+                SDL_Delay(100);
+            }
+            else if (SDL_PointInRectFloat(&MousePoint, &Leaderboard_Button))
+            {
+                IsLeaderboardOn = true;
+                SDL_Delay(100);
+            }
+        }
+#if 0 // For the BOMB in-game feature but it's cut due to time issues
+        if (UserIsTyping == false)
+        {
+            float x, y;
+            SDL_GetMouseState(&x, &y);
+            SDL_FPoint MousePoint;
+            MousePoint.x = x;
+            MousePoint.y = y;
+            if (SDL_PointInRectFloat(&MousePoint, &TilePosition))
+            {
+                SDL_Log("Mouse Button Pressed inside the Tile at (%.2f, %.2f)", event->button.x, event->button.y);
+                //Explode (Clear) All the tiles in the same column and row of the selected tile
             }
             else
             {
-                SDL_Log("Jump Ability Disabled");
+                SDL_Log("Mouse Button Pressed outside the Tile at (%.2f, %.2f)", event->button.x, event->button.y);
             }
-			break;
         }
-        break;
-    }
+#endif
+		break;
+    case SDL_EVENT_KEY_DOWN: //Inputs of the Game
+        if (IsGameOver == true)
+        {
+            IsGameOver = false;
+            IsMainMenuOn = true;
+        }
+        else
+        {
+            switch (event->key.scancode)
+            {
+            case SDL_SCANCODE_BACKSPACE:
+                if (!InputUserText.empty())
+                {
+                    InputUserText.pop_back();
+                }
+                break;
+            case SDL_SCANCODE_RETURN:
+                if (InputUserText.empty() == false)
+                {
+                    InputUserText.erase(remove(InputUserText.begin(), InputUserText.end(), ' '), InputUserText.end()); //Removing Spaces
+                    SDL_StopTextInput(Window);
+                    UserIsTyping = false;
+                }
+                break;
+            case SDL_SCANCODE_UP:
+                if (UserIsTyping == false)
+                {
+                    GoUp();
+                    RespawnTile();
+                }
+                break;
+            case SDL_SCANCODE_DOWN:
+                if (UserIsTyping == false)
+                {
+                    GoDown();
+                    RespawnTile();
+                }
+                break;
+            case SDL_SCANCODE_LEFT:
+                if (UserIsTyping == false)
+                {
+                    GoLeft();
+                    RespawnTile();
+                }
+                break;
+            case SDL_SCANCODE_RIGHT:
+                if (UserIsTyping == false)
+                {
+                    GoRight();
+                    RespawnTile();
+                }
+                break;
+            case SDL_SCANCODE_J:
+                if (UserIsTyping == false)
+                {
+                    JumpAbility = !JumpAbility; // For noob players :(
+                    if (JumpAbility)
+                    {
+                        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_INFORMATION, "2048 v2.0", "Jump Ability Enabled\nDon't abuse it :)", Window);
+                    }
+                    else
+                    {
+                        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_INFORMATION, "2048 v2.0", "Jump Ability Disabled\nThis is the right choice ;)", Window);
+                    }
+                }
+                break;
+            case SDL_SCANCODE_S:
+                if (UserIsTyping == false && AutoSave == false)
+                {
+                    SaveTheGame();
+                }
+                break;
+            }
+            break;
+        }
+        }
     return SDL_APP_CONTINUE;
 }
 
@@ -505,105 +917,39 @@ SDL_AppResult SDL_AppIterate(void* appstate)
 {
 	SDL_RenderClear(Renderer);
 
-    //Rendering stuff comes here
-    
-    //Rendering the Background
-    SDL_RenderTexture(Renderer, Background_Texture, NULL, NULL);
-
-    //Rendering the Grid
-    for(int i = 0; i < 4; i++)
+    // Scenes
+    if (IsMainMenuOn == true)
     {
-        SDL_FRect destRect1 = { 30.0f, 70.0f + (i * 100.0f), 64.0f * 1.5f, 64.0f * 1.5f};
-        SDL_RenderTexture(Renderer, Tile_Background_Texture, NULL, &destRect1);
-
-        SDL_FRect destRect2 = { 130.0f, 70.0f + (i * 100.0f), 64.0f * 1.5f, 64.0f * 1.5f };
-        SDL_RenderTexture(Renderer, Tile_Background_Texture, NULL, &destRect2);
-
-        SDL_FRect destRect3 = { 230.0f, 70.0f + (i * 100.0f), 64.0f * 1.5f, 64.0f * 1.5f };
-        SDL_RenderTexture(Renderer, Tile_Background_Texture, NULL, &destRect3);
-
-        SDL_FRect destRect4 = { 330.0f, 70.0f + (i * 100.0f), 64.0f * 1.5f, 64.0f * 1.5f };
-        SDL_RenderTexture(Renderer, Tile_Background_Texture, NULL, &destRect4);
-	}
-
-    //Rendering the Tiles
-    for (int i = 0; i < 4; i++)
-    {
-        for (int j = 0; j < 4; j++)
+        if (IsLeaderboardOn ==  false)
         {
-            switch (Grid[i][j])
-            {
-            case TILE_2:
-                TilePosition.x = 30.0f + (j * 100.0f);
-                TilePosition.y = 70.0f + (i * 100.0f);
-                SDL_RenderTexture(Renderer, _2_Texture, NULL, &TilePosition);
-                break;
-            case TILE_4:
-                TilePosition.x = 30.0f + (j * 100.0f);
-                TilePosition.y = 70.0f + (i * 100.0f);
-                SDL_RenderTexture(Renderer, _4_Texture, NULL, &TilePosition);
-                break;
-            case TILE_8:
-                TilePosition.x = 30.0f + (j * 100.0f);
-                TilePosition.y = 70.0f + (i * 100.0f);
-                SDL_RenderTexture(Renderer, _8_Texture, NULL, &TilePosition);
-                break;
-			case TILE_16:
-                TilePosition.x = 30.0f + (j * 100.0f);
-                TilePosition.y = 70.0f + (i * 100.0f);
-                SDL_RenderTexture(Renderer, _16_Texture, NULL, &TilePosition);
-                break;
-			case TILE_32:
-                TilePosition.x = 30.0f + (j * 100.0f);
-                TilePosition.y = 70.0f + (i * 100.0f);
-                SDL_RenderTexture(Renderer, _32_Texture, NULL, &TilePosition);
-                break;
-            case TILE_64:
-                TilePosition.x = 30.0f + (j * 100.0f);
-                TilePosition.y = 70.0f + (i * 100.0f);
-                SDL_RenderTexture(Renderer, _64_Texture, NULL, &TilePosition);
-                break;
-			case TILE_128:
-                TilePosition.x = 30.0f + (j * 100.0f);
-                TilePosition.y = 70.0f + (i * 100.0f);
-                SDL_RenderTexture(Renderer, _128_Texture, NULL, &TilePosition);
-                break;
-            case TILE_256:
-                TilePosition.x = 30.0f + (j * 100.0f);
-                TilePosition.y = 70.0f + (i * 100.0f);
-                SDL_RenderTexture(Renderer, _256_Texture, NULL, &TilePosition);
-                break;
-            case TILE_512:
-                TilePosition.x = 30.0f + (j * 100.0f);
-                TilePosition.y = 70.0f + (i * 100.0f);
-                SDL_RenderTexture(Renderer, _512_Texture, NULL, &TilePosition);
-				break;
-            case TILE_1024:
-                TilePosition.x = 30.0f + (j * 100.0f);
-                TilePosition.y = 70.0f + (i * 100.0f);
-                SDL_RenderTexture(Renderer, _1024_Texture, NULL, &TilePosition);
-				break;
-            case TILE_2048:
-                TilePosition.x = 30.0f + (j * 100.0f);
-                TilePosition.y = 70.0f + (i * 100.0f);
-                SDL_RenderTexture(Renderer, _2048_Texture, NULL, &TilePosition);
-                break;
-            }
+            MainMenuScene();
+        }
+        else
+        {
+            SDL_Log("Leaderboard Here: ");
+        }
+    }
+    else
+    {
+        if (IsGameOver == false)
+        {
+            _2048GameUIScene();
+            _2048GameScene();
+        }
+        else
+        {
+            GameOverScene();
         }
     }
 
-    /// JUST FOR TEST: (DELETE PLS)
-    SDL_Surface* surface = TTF_RenderText_Blended(Font, ("Score: " + std::to_string(Score)).c_str(), 0, Font_Color);
-    SDL_Texture* texture = SDL_CreateTextureFromSurface(Renderer, surface);
-    SDL_FRect destRect = { 20.0f, 20.0f, (float)surface->w, (float)surface->h };
-    SDL_RenderTexture(Renderer, texture, NULL, &destRect);
-
     SDL_RenderPresent(Renderer);
 
-
-    /// JUST FOR TEST: (DELETE PLS)
-    SDL_DestroySurface(surface);
-    SDL_DestroyTexture(texture);
+    //Deleting Resource to avoid Memory Leaking
+    SDL_DestroyTexture(ScoreTextWrapper);
+    SDL_DestroyTexture(UserInputTextureWrapper);
+    SDL_DestroyTexture(GameOverTextureWrapper);
+    SDL_DestroyTexture(MainMenu_Play_TextureWrapper);
+    SDL_DestroyTexture(MainMenu_Leaderboard_TextureWrapper);
 
     return SDL_APP_CONTINUE;
 }
@@ -613,4 +959,10 @@ void SDL_AppQuit(void* appstate, SDL_AppResult result)
 {
     TTF_CloseFont(Font);
     TTF_Quit();
+
+    _2048KillGameScene();
+    _2048KillGameUIScene();
+
+    SDL_DestroyRenderer(Renderer);
+    SDL_DestroyWindow(Window);
 }

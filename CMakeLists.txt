@@ -20,7 +20,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIGURATION>")
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIGURATION>")
 
 # Add source to this project's executable.
-add_executable (2048-v2.0) # WIN32 for Release Build should be applied
+add_executable (2048-v2.0 WIN32) # WIN32 for Release Build should be applied
 
 target_sources(2048-v2.0 PRIVATE
 	"src/main.cpp"
