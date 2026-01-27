@@ -4,6 +4,9 @@
 This version is a standalone app built with SDL3 for graphics and input handling.
 ![](https://github.com/farivarfarsian/2048-v2.0/assets/gameplay.gif)
 
+## Gameplay
+![gameplay](https://github.com/farivarfarsian/2048-v2.0/blob/master/assets/gameplay.gif)
+
 ## Requirements
 * CMake (used for build files)
 * A C/C++ compiler (e.g., GCC, Clang, MSVC)
