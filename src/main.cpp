@@ -1,7 +1,7 @@
 ﻿//Based on https://play2048.co/
 
 //TODO:
-// // - Add a Leaderboard
+// // - Paging for Leaderboard
 
 //Exclusive for Windows
 #ifdef _WIN32
@@ -18,9 +18,10 @@ using namespace tinyxml2;
 #include <string>
 #include <random>
 #include <filesystem>
+#include <vector>
 
 // for running a pieace of code only once
-bool Flag = 0 , Flag1 = 0;
+bool Flag = 0 , Flag1 = 0, Flag2 = 0;
 
 //SDL
 #define SDL_MAIN_USE_CALLBACKS 1
@@ -78,11 +79,12 @@ bool IsScoreChanged = false;
 bool IsGameOver = false;
 bool IsMainMenuOn = true;
 bool IsLeaderboardOn = false;
+bool IsBackPressed = false;
 bool IsGridFull = false;
 
 SDL_FRect TilePosition = { 30.0f, 70.0f, 64.0f * 1.5f, 64.0f * 1.5f };
 // Buttons
-SDL_FRect Play_Button, Leaderboard_Button;
+SDL_FRect Play_Button, Leaderboard_Button, Back_Button;
 
 // Wrapper Functions and Variables
 SDL_Texture* ScoreTextWrapper = nullptr;
@@ -95,19 +97,47 @@ SDL_Texture* MainMenu_Leaderboard_TextureWrapper = nullptr;
 XMLDocument Document;
 XMLElement* Leaderboard = nullptr;
 XMLElement* CurrentUser = nullptr;
+std::vector<std::string> UsernamesScores;
 
 //Game features
 bool JumpAbility = false;
 bool AutoSave = true;
 void SaveTheGame()
 {
-    CurrentUser = Document.NewElement("User");
-    CurrentUser->SetAttribute(InputUserText.c_str(), 1);
-    Document.FirstChildElement()->InsertEndChild(CurrentUser);
+	// Improvements for this could be using a hash map to store users for O(1) access time
+    
 
-    XMLElement* ScoreElement = Document.NewElement("Score");
-    ScoreElement->SetText(Score);
-    CurrentUser->InsertEndChild(ScoreElement);
+	// Iterating through XML to find if user exists
+    bool UserExists = false;
+    for (XMLElement* userElem = Document.FirstChildElement()->FirstChildElement("User");
+        userElem != nullptr;
+        userElem = userElem->NextSiblingElement("User"))
+    {
+        std::string username = "default";
+
+        const XMLAttribute* attr = userElem->FirstAttribute();
+        if (attr) 
+        {
+            username = attr->Name();
+        }
+        if(username == InputUserText)
+        {
+            userElem->FirstChildElement("Score")->SetText(Score);
+            UserExists = true;
+            break;
+		}
+    }
+
+    if (UserExists == false)
+    {
+        CurrentUser = Document.NewElement("User");
+        CurrentUser->SetAttribute(InputUserText.c_str(), 1);
+        Document.FirstChildElement()->InsertEndChild(CurrentUser);
+
+        XMLElement* ScoreElement = Document.NewElement("Score");
+        ScoreElement->SetText(Score);
+        CurrentUser->InsertEndChild(ScoreElement);
+    }
 
     Document.SaveFile("Leaderboard.xml");
 }
@@ -331,12 +361,105 @@ void GameOverScene()
     }
     Score = 0;
     InputUserText.clear();
-    Flag = 0, Flag1 = 0;
+    Flag = 0, Flag1 = 0, Flag2 = 0;
 
     Grid[0][0] = TILE_2;
     Grid[3][3] = TILE_2;
 
     // Going Back to Main Menu ... 
+}
+// Leaderboard
+void LeaderboardScene()
+{
+    SDL_FRect DestRect;
+    DestRect = { 0.0f, 0.0f, 576, 900 };
+
+    SDL_RenderTexture(Renderer, MainMenu_Texture, NULL, &DestRect);
+
+    //Render them as text on screen
+    SDL_Surface* Surface = TTF_RenderText_Blended(Font, "Leaderboard: ", 0, { 0,0,255,255 });
+    SDL_Texture* Texture = SDL_CreateTextureFromSurface(Renderer, Surface);
+    SDL_FRect destRect = { 30.0f, 10.0f, (float)Surface->w, (float)Surface->h };
+
+    SDL_RenderTexture(Renderer, Texture, NULL, &destRect);
+
+    SDL_DestroySurface(Surface);
+
+    SDL_DestroyTexture(Texture);
+
+
+    //Render them as text on screen
+    Surface = TTF_RenderText_Blended(Font, "Back...", 0, { 255,0,0,255 });
+    Texture = SDL_CreateTextureFromSurface(Renderer, Surface);
+    Back_Button = { 30.0f, 500.0f, (float)Surface->w, (float)Surface->h };
+
+    SDL_RenderTexture(Renderer, Texture, NULL, &Back_Button);
+
+    SDL_DestroySurface(Surface);
+
+    SDL_DestroyTexture(Texture);
+
+    if (Flag2 == 0)
+    {
+        XMLElement* UserElememt = Document.FirstChildElement()->FirstChildElement("User");
+        std::string LastUsername;
+
+        while (UserElememt != nullptr)
+        {
+
+            std::string Username;
+
+            //Retrieving Username and Score
+            const XMLAttribute* Name = UserElememt->FirstAttribute();
+            XMLElement* ScoreElement = nullptr;
+            if (Name)
+            {
+                Username = Name->Name();
+                if (LastUsername.empty() == false)
+                {
+                    if (LastUsername == Username)
+                    {
+                        goto AvoidDup; // Avoiding Duplicates
+                    }
+                    else
+                    {
+                        LastUsername = Username;
+                    }
+                }
+
+            }
+
+            ScoreElement = UserElememt->FirstChildElement("Score");
+            if (ScoreElement)
+            {
+                Score = ScoreElement->IntText();
+            }
+
+            UsernamesScores.push_back((Username + ": " + std::to_string(Score)));
+
+        AvoidDup:
+            UserElememt = UserElememt->NextSiblingElement("User");
+
+        }
+        if (UserElememt == nullptr)
+        {
+            Flag2 = 1;
+        }
+    }
+
+    for (int i = 0; i < UsernamesScores.size(); i++)
+    {
+        //Render them as text on screen
+        SDL_Surface* Surface = TTF_RenderText_Blended(Font, UsernamesScores[i].c_str(), 0, Font_Color);
+        SDL_Texture* Texture = SDL_CreateTextureFromSurface(Renderer, Surface);
+        SDL_FRect destRect = { 50.0f, 50.0f + (i * 40.0f), (float)Surface->w, (float)Surface->h };
+
+        SDL_RenderTexture(Renderer, Texture, NULL, &destRect);
+
+        SDL_DestroySurface(Surface);
+
+        SDL_DestroyTexture(Texture);
+    }
 }
 
 // Scene Killers
@@ -364,6 +487,15 @@ void _2048KillGameUIScene()
 {
     SDL_DestroyTexture(Background_Texture);
     SDL_DestroyTexture(MainMenu_Texture);
+}
+void KillLeaderboardScene()
+{
+    //Reseting values
+    IsLeaderboardOn = false;
+    IsBackPressed = false;
+    UsernamesScores.clear();
+    Score = 0;
+    Flag2 = 0;
 }
 
 // Functions for Handeling Moves
@@ -812,6 +944,11 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event)
                 IsLeaderboardOn = true;
                 SDL_Delay(100);
             }
+            else if (SDL_PointInRectFloat(&MousePoint, &Back_Button))
+            {
+                IsBackPressed = true;
+                SDL_Delay(100);
+            }
         }
 #if 0 // For the BOMB in-game feature but it's cut due to time issues
         if (UserIsTyping == false)
@@ -926,7 +1063,14 @@ SDL_AppResult SDL_AppIterate(void* appstate)
         }
         else
         {
-            SDL_Log("Leaderboard Here: ");
+            if (IsBackPressed == false)
+            {
+                LeaderboardScene();
+            }
+            else
+            {
+				KillLeaderboardScene();
+            }
         }
     }
     else
