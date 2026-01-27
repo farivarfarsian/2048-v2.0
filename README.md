@@ -2,6 +2,7 @@
 
 2048 v2.0 is a C/C++ implementation of the classic puzzle game 2048, where the goal is to combine numbered tiles to reach the tile with the value 2048.
 This version is a standalone app built with SDL3 for graphics and input handling.
+![](https://github.com/farivarfarsian/2048-v2.0/assets/gameplay.gif)
 
 ## Requirements
 * CMake (used for build files)
