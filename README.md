@@ -31,7 +31,8 @@ Use the keyboard arrow keys:
 | →   | Move all tiles right |
 
 ## Screenshots
-
+![screenshot1](https://github.com/farivarfarsian/2048-v2.0/blob/master/assets/Screenshot_1.png)
+![screenshot2](https://github.com/farivarfarsian/2048-v2.0/blob/master/assets/Screenshot_2.png)
 
 ### License
 This project is licensed under the MIT License — see LICENSE.txt for details.
